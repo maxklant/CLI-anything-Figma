@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>CLI-Anything Bridge</title>
+<style>
+  body { font-family: monospace; font-size: 11px; padding: 8px; background: #1e1e2e; color: #cdd6f4; margin: 0; }
+  #status { padding: 4px 8px; border-radius: 4px; margin-bottom: 6px; font-weight: bold; }
+  .connected    { background: #a6e3a1; color: #1e1e2e; }
+  .disconnected { background: #f38ba8; color: #1e1e2e; }
+  .waiting      { background: #f9e2af; color: #1e1e2e; }
+  #log { height: 120px; overflow-y: auto; font-size: 10px; opacity: 0.7; }
+  #log div { border-bottom: 1px solid #313244; padding: 1px 0; }
+</style>
+</head>
+<body>
+<div id="status" class="waiting">Connecting to bridge...</div>
+<div id="log"></div>
+<script>
+const BASE = 'http://localhost:7777';
+let running = true;
+let cmdCount = 0;
+
+function setStatus(text, cls) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = cls;
+}
+
+function log(msg) {
+  const el = document.getElementById('log');
+  const d = document.createElement('div');
+  d.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+  if (el.children.length > 100) el.removeChild(el.firstChild);
+}
+
+// Long-poll loop: ask server for next command, execute it, repeat
+async function pollLoop() {
+  while (running) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(function() { controller.abort(); }, 28000);
+      let resp;
+      try { resp = await fetch(BASE + '/poll', { signal: controller.signal }); }
+      finally { clearTimeout(timer); }
+
+      if (resp.status === 200) {
+        const cmd = await resp.json();
+        cmdCount++;
+        setStatus('Connected — ' + cmdCount + ' cmd(s) executed', 'connected');
+        log('[' + cmdCount + '] ' + cmd.command + ' id=' + (cmd.id || '').substring(0, 8));
+        // Forward to code.js
+        window.parent.postMessage({ pluginMessage: cmd }, '*');
+      } else if (resp.status === 204) {
+        // No command pending — just show connected
+        setStatus('Connected to bridge (http://localhost:7777)', 'connected');
+      } else {
+        setStatus('Bridge error: HTTP ' + resp.status, 'disconnected');
+        await sleep(3000);
+      }
+    } catch (e) {
+      setStatus('Bridge not running — retrying...', 'disconnected');
+      log('Error: ' + (e.message || 'fetch failed'));
+      await sleep(3000);
+    }
+  }
+}
+
+// Receive results from code.js and POST back to bridge
+window.onmessage = async (event) => {
+  const msg = event.data && event.data.pluginMessage;
+  if (!msg || !msg.id) return;
+  try {
+    await fetch(BASE + '/result/' + msg.id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(msg),
+    });
+    log('result: ' + msg.status + ' id=' + msg.id.substring(0, 8));
+  } catch (e) {
+    log('Failed to send result: ' + e.message);
+  }
+};
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+pollLoop();
+</script>
+</body>
+</html>

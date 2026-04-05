@@ -1,0 +1,2 @@
+[console_scripts]
+cli-anything-figma = cli_anything.figma.figma_cli:main

@@ -1,0 +1,9 @@
+click>=8.0.0
+prompt-toolkit>=3.0.0
+requests>=2.31.0
+websockets>=11.0
+
+[dev]
+pytest
+pytest-cov
+responses

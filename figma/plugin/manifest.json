@@ -1,0 +1,13 @@
+{
+  "name": "CLI-Anything Bridge",
+  "id": "cli-anything-bridge-001",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["none"],
+    "reasoning": "Connects to a local CLI bridge server for programmatic design automation.",
+    "devAllowedDomains": ["http://localhost:7777"]
+  }
+}
